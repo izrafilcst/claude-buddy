@@ -4,41 +4,91 @@
 #include "colors.h"
 #include "api_client.h"
 #include "display_manager.h"
+#include "touch_handler.h"
+
+enum class Mode : uint8_t { IDLE, DATA };
 
 static DisplayManager display;
+static TouchHandler touch;
 static ApiClient api;
 static ClaudeStatus status;
-static unsigned long last_poll = 0;
+
+static Mode mode = Mode::IDLE;
 static bool wifi_ok = false;
+static bool data_dirty = false;
+static unsigned long last_poll = 0;
+static unsigned long last_touch_time = 0;
+
+static void poll() {
+    wifi_ok = (WiFi.status() == WL_CONNECTED);
+    if (!wifi_ok) { WiFi.reconnect(); return; }
+    if (api.fetch(status)) data_dirty = true;
+}
+
+static void switchMode(Mode next) {
+    if (mode == next) return;
+    mode = next;
+    if (next == Mode::IDLE) {
+        display.drawIdleBackground();
+    } else {
+        display.drawDataScreen(status, 100, wifi_ok);
+        data_dirty = false;
+    }
+}
 
 void setup() {
     Serial.begin(115200);
     display.begin();
+    touch.begin(display.tft());
+    api.begin(AGENT_HOST, AGENT_PORT);
 
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
     display.tft()->setTextColor(Colors::CLOUDY, Colors::PAMPAS);
     display.tft()->setTextDatum(MC_DATUM);
-    display.tft()->drawString("Connecting WiFi...", SCREEN_W / 2, SCREEN_H / 2, 2);
+    display.tft()->drawString("Connecting...", SCREEN_W / 2, SCREEN_H / 2, 2);
 
-    for (int i = 0; i < 20 && WiFi.status() != WL_CONNECTED; i++) {
-        delay(500);
-    }
+    WiFi.begin(WIFI_SSID, WIFI_PASS);
+    for (int i = 0; i < 20 && WiFi.status() != WL_CONNECTED; i++) delay(500);
     wifi_ok = (WiFi.status() == WL_CONNECTED);
 
-    api.begin(AGENT_HOST, AGENT_PORT);
-    api.fetch(status);
-
-    display.drawDataScreen(status, 100, wifi_ok);
+    poll();
+    switchMode(Mode::IDLE);
 }
 
 void loop() {
     unsigned long now = millis();
+
+    TouchEvent ev = touch.update();
+    if (ev == TouchEvent::TAP) {
+        last_touch_time = now;
+        if (mode == Mode::IDLE) {
+            poll();
+            switchMode(Mode::DATA);
+        }
+    }
+
     if (now - last_poll >= POLL_INTERVAL_MS) {
-        wifi_ok = (WiFi.status() == WL_CONNECTED);
-        if (wifi_ok) api.fetch(status);
-        display.drawDataScreen(status, 100, wifi_ok);
+        poll();
         last_poll = now;
     }
-    display.animateHeaderDots();
+
+    if (mode == Mode::DATA && now - last_touch_time >= DATA_TIMEOUT_MS) {
+        switchMode(Mode::IDLE);
+    }
+
+    switch (mode) {
+    case Mode::IDLE:
+        display.tft()->setTextColor(Colors::CLOUDY, Colors::PAMPAS);
+        display.tft()->setTextDatum(MC_DATUM);
+        display.tft()->drawString("Tap for data", SCREEN_W / 2, SCREEN_H / 2, 2);
+        break;
+    case Mode::DATA:
+        if (data_dirty) {
+            display.drawDataScreen(status, 100, wifi_ok);
+            data_dirty = false;
+        }
+        display.animateHeaderDots();
+        break;
+    }
+
     delay(ANIM_FRAME_MS);
 }
