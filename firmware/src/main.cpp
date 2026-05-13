@@ -29,8 +29,13 @@ static unsigned long last_bat_read = 0;
 
 static void poll() {
     wifi_ok = (WiFi.status() == WL_CONNECTED);
-    if (!wifi_ok) { WiFi.reconnect(); return; }
-    if (api.fetch(status)) data_dirty = true;
+    if (!wifi_ok) {
+        WiFi.reconnect();
+        status.valid = false;
+        return;
+    }
+    api.fetch(status);
+    data_dirty = true;
 }
 
 static void switchMode(Mode next) {
@@ -112,6 +117,11 @@ void loop() {
             data_dirty = false;
         }
         display.animateHeaderDots();
+        if (!wifi_ok) {
+            display.drawErrorOverlay("WiFi disconnected");
+        } else if (!status.valid) {
+            display.drawErrorOverlay("Agent offline");
+        }
         break;
     }
 
