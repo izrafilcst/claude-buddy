@@ -1,0 +1,11 @@
+# PlatformIO build artifacts
+firmware/.pio/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Editor
+.vscode/
+*.swp
