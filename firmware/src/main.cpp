@@ -5,12 +5,14 @@
 #include "api_client.h"
 #include "display_manager.h"
 #include "touch_handler.h"
+#include "tamagotchi.h"
 
 enum class Mode : uint8_t { IDLE, DATA };
 
 static DisplayManager display;
 static TouchHandler touch;
 static ApiClient api;
+static Tamagotchi mascot;
 static ClaudeStatus status;
 
 static Mode mode = Mode::IDLE;
@@ -41,6 +43,7 @@ void setup() {
     display.begin();
     touch.begin(display.tft());
     api.begin(AGENT_HOST, AGENT_PORT);
+    mascot.begin(display.tft());
 
     display.tft()->setTextColor(Colors::CLOUDY, Colors::PAMPAS);
     display.tft()->setTextDatum(MC_DATUM);
@@ -77,9 +80,8 @@ void loop() {
 
     switch (mode) {
     case Mode::IDLE:
-        display.tft()->setTextColor(Colors::CLOUDY, Colors::PAMPAS);
-        display.tft()->setTextDatum(MC_DATUM);
-        display.tft()->drawString("Tap for data", SCREEN_W / 2, SCREEN_H / 2, 2);
+        mascot.setState(status.quota_percent, status.valid, wifi_ok);
+        mascot.drawFrame();
         break;
     case Mode::DATA:
         if (data_dirty) {
