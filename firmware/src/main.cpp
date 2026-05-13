@@ -2,6 +2,11 @@
 #include <WiFi.h>
 #include "config.h"
 #include "colors.h"
+#include "api_client.h"
+
+static ApiClient api;
+static ClaudeStatus status;
+static unsigned long last_poll = 0;
 
 void setup() {
     Serial.begin(115200);
@@ -21,8 +26,24 @@ void setup() {
     } else {
         Serial.println(" FAIL");
     }
+
+    api.begin(AGENT_HOST, AGENT_PORT);
+    if (api.fetch(status)) {
+        Serial.printf("Quota: %d%% Sessions: %d Plan: %s\n",
+            status.quota_percent, status.sessions_active, status.plan);
+    } else {
+        Serial.println("Agent fetch failed");
+    }
 }
 
 void loop() {
-    delay(1000);
+    unsigned long now = millis();
+    if (now - last_poll >= POLL_INTERVAL_MS) {
+        if (api.fetch(status)) {
+            Serial.printf("Quota: %d%% Sessions: %d\n",
+                status.quota_percent, status.sessions_active);
+        }
+        last_poll = now;
+    }
+    delay(100);
 }
