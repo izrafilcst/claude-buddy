@@ -3,8 +3,12 @@
 #define WIFI_SSID "YOUR_SSID"
 #define WIFI_PASS "YOUR_PASS"
 
+#ifndef AGENT_HOST
 #define AGENT_HOST "192.168.1.100"
+#endif
+#ifndef AGENT_PORT
 #define AGENT_PORT 8266
+#endif
 
 #define PIN_TFT_BL    48
 #define PIN_TOUCH_CS  12
