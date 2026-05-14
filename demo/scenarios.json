@@ -1,0 +1,8 @@
+{
+  "radiant":   { "quota_percent": 10, "sessions_active": 1, "sessions_details": [{"pid": 1001, "uptime_min": 45}],  "reset_minutes": 320, "plan": "pro" },
+  "content":   { "quota_percent": 40, "sessions_active": 2, "sessions_details": [{"pid": 1001, "uptime_min": 120}, {"pid": 1002, "uptime_min": 20}], "reset_minutes": 200, "plan": "pro" },
+  "normal":    { "quota_percent": 58, "sessions_active": 1, "sessions_details": [{"pid": 1003, "uptime_min": 90}],  "reset_minutes": 130, "plan": "pro" },
+  "tired":     { "quota_percent": 72, "sessions_active": 1, "sessions_details": [{"pid": 1004, "uptime_min": 240}], "reset_minutes": 80,  "plan": "pro" },
+  "exhausted": { "quota_percent": 88, "sessions_active": 3, "sessions_details": [{"pid": 1005, "uptime_min": 480}, {"pid": 1006, "uptime_min": 60}, {"pid": 1007, "uptime_min": 15}], "reset_minutes": 20, "plan": "pro" },
+  "offline":   { "quota_percent": -1, "sessions_active": 0, "sessions_details": [], "reset_minutes": -1, "plan": "unknown" }
+}
