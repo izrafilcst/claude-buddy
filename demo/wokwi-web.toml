@@ -1,16 +1,10 @@
 # Wokwi web simulator config (wokwi.com)
-# Use this instead of wokwi.toml when simulating on wokwi.com
-#
-# Before using:
-#   1. Deploy demo/mock_agent.py to Railway (see demo/Procfile)
-#   2. Update AGENT_HOST in firmware/platformio.ini [env:esp32s3-demo-web]
-#   3. Compile: cd firmware && pio run -e esp32s3-demo-web
-#   4. Upload project to wokwi.com — use diagram.json + this file as wokwi.toml
+# No wokwi.com: criar novo projeto ESP32, colar diagram.json, criar wokwi.toml com este conteúdo.
 
 [wokwi]
 version = 1
-firmware = '../firmware/.pio/build/esp32s3-demo-web/firmware.elf'
-elf = '../firmware/.pio/build/esp32s3-demo-web/firmware.elf'
+firmware = 'https://github.com/izrafilcst/claude-buddy/releases/download/v1.0-demo/firmware.elf'
+elf = 'https://github.com/izrafilcst/claude-buddy/releases/download/v1.0-demo/firmware.elf'
 
 [wifi]
 ssid = "Wokwi-GUEST"
