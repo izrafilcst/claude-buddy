@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "author": "Rafael Costa",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-s3-devkitc-1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-ili9341",
+      "id": "lcd",
+      "top": -160,
+      "left": 220,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz",
+      "top": 230,
+      "left": 220,
+      "attrs": { "volume": "0.1" }
+    }
+  ],
+  "connections": [
+    ["esp:3V3.1",  "lcd:VCC",    "red",    []],
+    ["esp:GND.1",  "lcd:GND",    "black",  []],
+    ["esp:GPIO11", "lcd:MOSI",   "green",  []],
+    ["esp:GPIO18", "lcd:SCK",    "blue",   []],
+    ["esp:GPIO13", "lcd:MISO",   "orange", []],
+    ["esp:GPIO10", "lcd:CS",     "yellow", []],
+    ["esp:GPIO14", "lcd:DC",     "purple", []],
+    ["esp:GPIO9",  "lcd:RST",    "brown",  []],
+    ["esp:GPIO48", "lcd:LED",    "white",  []],
+    ["esp:GPIO18", "lcd:T_CLK",  "blue",   []],
+    ["esp:GPIO12", "lcd:T_CS",   "gray",   []],
+    ["esp:GPIO11", "lcd:T_DIN",  "green",  []],
+    ["esp:GPIO13", "lcd:T_DO",   "orange", []],
+    ["esp:GPIO21", "lcd:T_IRQ",  "pink",   []],
+    ["esp:GPIO47", "bz:1",       "red",    []],
+    ["esp:GND.2",  "bz:2",       "black",  []]
+  ]
+}
