@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="docs/mascot-beach.gif" width="480" alt="Claude Buddy mascot — dia e noite na praia"/>
+<img src="docs/mascot-beach.gif" width="480" alt="Claw'd — day fishing, night sleeping"/>
 
 # Claude Buddy
 
-**Monitor físico de sessões do Claude Code — ESP32-S3 com display TFT 240×320**
+**Physical status monitor for Claude Code sessions — ESP32-S3 + 240×320 TFT display**
 
 [![GitHub stars](https://img.shields.io/github/stars/izrafilcst/claude-buddy?style=flat-square&color=C15F3C)](https://github.com/izrafilcst/claude-buddy/stargazers)
 [![GitHub license](https://img.shields.io/github/license/izrafilcst/claude-buddy?style=flat-square)](LICENSE)
@@ -15,276 +15,272 @@
 
 ---
 
-## Por que o Claude Buddy existe?
+## Why Claude Buddy?
 
-Passar horas programando com o Claude Code é produtivo — mas invisível. Você não sabe quanto da sua cota mensal já consumiu, quantas sessões estão abertas em paralelo ou quando está chegando perto do limite sem checar o painel na web.
+Spending hours coding with Claude Code is productive — but invisible. You don't know how much of your monthly quota you've burned, how many sessions are running in parallel, or when you're approaching the limit without opening a web dashboard.
 
-O **Claude Buddy** resolve isso com um dispositivo físico que fica na sua mesa. Um mascote virtual — o **Orb** — vive no display e reflete o estado das suas sessões em tempo real: relaxado quando tudo está tranquilo, cansado quando a cota está alta, exausto quando está no limite. Sem abrir o browser. Sem distrações.
+**Claude Buddy** solves this with a physical device that sits on your desk. A virtual mascot — **Claw'd** — lives on the display and reflects your session state in real time: relaxed when everything is fine, tired when the quota is high, exhausted when you're close to the cap. No browser needed. No distractions.
 
-É o Tamagotchi do seu agente.
+It's a Tamagotchi for your AI agent.
 
 ---
 
-## Como funciona
+## How it works
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Seu computador                                          │
+│  Your computer                                           │
 │                                                          │
 │  python agent/claude_agent.py  ──►  HTTP :8266          │
 │         │                                                │
-│         ├── detecta processos claude (pgrep)             │
-│         └── lê ~/.claude/settings.json (cota)           │
+│         ├── detects claude processes (pgrep)             │
+│         └── reads ~/.claude/settings.json (quota)        │
 └────────────────────────┬────────────────────────────────┘
-                         │ WiFi (mesma rede)
+                         │ WiFi (same network)
 ┌────────────────────────▼────────────────────────────────┐
-│  ESP32-S3 + ILI9341 240×320                             │
+│  ESP32-S3 + ILI9341 240×320                              │
 │                                                          │
 │  ┌──────────┐  ┌────────────────┐  ┌────────────────┐  │
 │  │  Idle    │  │   Data screen  │  │    Settings    │  │
-│  │  mascote │  │  quota + sessões│  │  WiFi / agent  │  │
-│  │  animado │  │  bateria + WiFi│  │  threshold     │  │
+│  │  Claw'd  │  │  quota+sessions│  │  WiFi / agent  │  │
+│  │ animated │  │  battery+WiFi  │  │  alert thresh  │  │
 │  └──────────┘  └────────────────┘  └────────────────┘  │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Estados do mascote
+## Mascot states
 
-| Estado | Quota | Sessões | Visual |
+| State | Quota | Sessions | Visual |
 |--------|-------|---------|--------|
-| **RADIANT** | < 30% | ≥ 1 | Orb brilhante, partículas douradas |
-| **CONTENT** | 30–50% | ≥ 1 | Orb suave, movimento tranquilo |
-| **NORMAL** | 50–65% | ≥ 1 | Orb estável |
-| **TIRED** | 65–80% | ≥ 1 | Orb mais lento, tom mais frio |
-| **EXHAUSTED** | > 80% | ≥ 1 | Orb pulsando lento, Zzz |
-| **OFF** | — | 0 | Orb apagado |
-| **SEARCHING** | — | — | WiFi desconectado |
-| **CONFUSED** | — | — | Agente offline |
+| **RADIANT** | < 30% | ≥ 1 | Bright orb, golden particles |
+| **CONTENT** | 30–50% | ≥ 1 | Calm movement |
+| **NORMAL** | 50–65% | ≥ 1 | Steady |
+| **TIRED** | 65–80% | ≥ 1 | Slower, cooler tone |
+| **EXHAUSTED** | > 80% | ≥ 1 | Slow pulse, Zzz |
+| **OFF** | — | 0 | Dim |
+| **SEARCHING** | — | — | WiFi disconnected |
+| **CONFUSED** | — | — | Agent offline |
 
 ---
 
-## Hardware necessário
+## Hardware
 
-| Componente | Modelo |
+| Component | Model |
 |---|---|
-| Microcontrolador | ESP32-S3 DevKit-C1 (N16R8 recomendado) |
-| Display | ILI9341 240×320 SPI com touch XPT2046 |
-| Buzzer | Piezo passivo |
-| Bateria (opcional) | Li-Po 3.7V com divisor de tensão 100kΩ + 100kΩ |
+| Microcontroller | ESP32-S3 DevKit-C1 (N16R8 recommended) |
+| Display | ILI9341 240×320 SPI with XPT2046 touch |
+| Buzzer | Passive piezo |
+| Battery (optional) | Li-Po 3.7V with 100kΩ + 100kΩ voltage divider |
 
-### Pinagem
+### Wiring
 
-| ESP32-S3 | Display | Função |
+| ESP32-S3 | Display | Function |
 |---|---|---|
-| GPIO 11 | MOSI / T_DIN | Dados SPI (display + touch) |
-| GPIO 18 | SCK / T_CLK | Clock SPI (display + touch) |
-| GPIO 13 | MISO / T_DO | Retorno SPI (display + touch) |
-| GPIO 10 | CS | Chip select display |
+| GPIO 11 | MOSI / T_DIN | SPI data (display + touch) |
+| GPIO 18 | SCK / T_CLK | SPI clock (display + touch) |
+| GPIO 13 | MISO / T_DO | SPI return (display + touch) |
+| GPIO 10 | CS | Display chip select |
 | GPIO 14 | DC | Data / Command |
 | GPIO 9 | RST | Reset |
 | GPIO 48 | LED / BL | Backlight |
-| GPIO 12 | T_CS | Chip select touch |
-| GPIO 21 | T_IRQ | Interrupt touch |
+| GPIO 12 | T_CS | Touch chip select |
+| GPIO 21 | T_IRQ | Touch interrupt |
 | GPIO 47 | Piezo (+) | Buzzer |
-| GPIO 1 | Divisor tensão | Leitura bateria (ADC) |
+| GPIO 1 | Voltage divider | Battery ADC |
 
-> ⚡ O módulo ILI9341 opera em **3.3V**. Touch e display compartilham SCK/MOSI/MISO — apenas os CS são separados.
+> ⚡ The ILI9341 module runs at **3.3V**. Touch and display share SCK/MOSI/MISO — only the CS pins differ.
 
 ---
 
-## Estrutura do projeto
+## Project structure
 
 ```
 claude-buddy/
 │
 ├── agent/
-│   ├── claude_agent.py       # Servidor HTTP — detecta sessões e cota
-│   └── test_claude_agent.py  # 7 testes unitários
+│   ├── claude_agent.py       # HTTP server — detects sessions and quota
+│   └── test_claude_agent.py  # 7 unit tests
 │
 ├── firmware/
 │   ├── platformio.ini        # Envs: esp32s3, esp32s3-demo-web, esp32s3-debug
 │   └── src/
-│       ├── main.cpp          # Loop principal, WiFiManager, settings NVS
-│       ├── config.h          # Pinos, timings, defaults
-│       ├── colors.h          # Paleta RGB565 (marca Claude)
+│       ├── main.cpp          # Main loop, WiFiManager, NVS settings
+│       ├── config.h          # Pins, timings, defaults
+│       ├── colors.h          # RGB565 palette (Claude brand)
 │       ├── api_client.h/cpp  # HTTP GET /status → ClaudeStatus
-│       ├── display_manager.h/cpp  # Telas idle, data, settings, erro
-│       ├── tamagotchi.h/cpp  # Mascote, estados, animação sprite 64×64
-│       ├── touch_handler.h/cpp   # TAP / LONG_PRESS
+│       ├── display_manager.h/cpp  # Idle, data, settings, error screens
+│       ├── tamagotchi.h/cpp  # Mascot, states, 64×64 sprite animation
+│       ├── touch_handler.h/cpp   # TAP / LONG_PRESS events
 │       ├── alert.h/cpp       # Threshold crossing → piezo melody
-│       ├── battery.h/cpp     # ADC → percentual Li-Po
-│       └── debug_scenarios.h # 7 cenários mock para modo debug
+│       ├── battery.h/cpp     # ADC → Li-Po percentage
+│       └── debug_scenarios.h # 7 hardcoded mock scenarios for debug mode
 │
 ├── demo/
-│   ├── mock_agent.py         # Mock HTTP server — auto-ciclo + /control
-│   ├── scenarios.json        # Payloads dos 7 cenários
-│   ├── diagram.json          # Circuito Wokwi (ESP32-S3 + ILI9341 + piezo)
-│   ├── wokwi.toml            # Config Wokwi VS Code (localhost)
-│   ├── wokwi-web.toml        # Config Wokwi web (Railway URL)
-│   ├── Procfile              # Deploy Railway
+│   ├── mock_agent.py         # Mock HTTP server — auto-cycle + /control endpoint
+│   ├── scenarios.json        # 7 scenario payloads
+│   ├── diagram.json          # Wokwi circuit (ESP32-S3 + ILI9341 + piezo)
+│   ├── wokwi.toml            # Wokwi VS Code config (localhost)
+│   ├── wokwi-web.toml        # Wokwi web config (Railway URL)
+│   ├── Procfile              # Railway deployment
 │   └── requirements.txt      # Python stdlib only
 │
 └── docs/
-    ├── mascot-beach.gif      # Este GIF aqui em cima
-    ├── gen_mascot_gif.py     # Script que gerou o GIF
-    └── superpowers/          # Design specs e planos de implementação
+    ├── mascot-beach.gif      # Claw'd animation above
+    └── gen_mascot_gif.py     # Script that generated the GIF
 ```
 
 ---
 
-## Setup — Agente (PC)
+## Setup — Agent (PC)
 
-O agente é um servidor HTTP Python puro (sem dependências externas) que roda no seu computador.
+The agent is a dependency-free Python HTTP server that runs on your computer.
 
 ```bash
-# Iniciar o agente real
+# Start the real agent
 python3 agent/claude_agent.py
 
-# Rodar os testes
-python3 -m pytest agent/test_claude_agent.py -v
+# Run tests
+python3 -m pytest agent/ -v
 ```
 
-O agente detecta processos `claude` via `pgrep` e lê a cota em `~/.claude/settings.json`. Serve na porta **8266**.
+The agent detects `claude` processes via `pgrep` and reads quota from `~/.claude/settings.json`. Serves on port **8266**.
 
 ---
 
 ## Setup — Firmware
 
-### Pré-requisitos
+### Prerequisites
 
 ```bash
 pip install platformio
 ```
 
-### Compilar e gravar
+### Build and flash
 
 ```bash
 cd firmware
 
-# Firmware normal (conecta ao agente real)
+# Production firmware (connects to real agent)
 pio run -e esp32s3 -t upload
 
-# Monitor serial
+# Serial monitor
 pio device monitor
 ```
 
-### Configurar WiFi e agente
+### Configure WiFi and agent
 
-Na **primeira boot**, o dispositivo cria um hotspot chamado `ClaudeTamagotchi`. Conecte-se e acesse `192.168.4.1` para configurar:
+On **first boot**, the device creates a hotspot called `ClaudeTamagotchi`. Connect to it and open `192.168.4.1` to configure:
 
-- **WiFi SSID / Password** — sua rede doméstica
-- **Agent Host** — IP do seu computador na rede (ex: `192.168.1.100`)
-- **Agent Port** — `8266` (padrão)
-- **Alert threshold** — porcentagem de cota para disparar o alerta (padrão: 20%)
+- **WiFi SSID / Password** — your home network
+- **Agent Host** — your computer's IP on the network (e.g. `192.168.1.100`)
+- **Agent Port** — `8266` (default)
+- **Alert threshold** — quota percentage to trigger the alert (default: 20%)
 
-As configurações ficam salvas em NVS (sobrevivem a reboot). Para reconfigurar: **long press** na tela → Settings → **long press** novamente → abre o portal.
+Settings are saved to NVS and survive reboots. To reconfigure: **long press** → Settings → **long press again** → opens the captive portal.
 
 ---
 
-## Controles
+## Controls
 
-| Gesto | Tela Idle | Tela Data | Settings |
+| Gesture | Idle screen | Data screen | Settings |
 |---|---|---|---|
-| **Tap** | Abre tela de dados | Mantém na tela | Volta ao Idle |
-| **Long press** | Abre Settings | Abre Settings | Abre portal WiFi |
+| **Tap** | Opens data screen | Stays on data | Returns to Idle |
+| **Long press** | Opens Settings | Opens Settings | Opens WiFi portal |
 
-A tela de dados volta ao Idle automaticamente após **10 segundos** sem toque.
+The data screen returns to Idle automatically after **10 seconds** of inactivity.
 
 ---
 
-## Modo Debug (sem WiFi, hardware real)
+## Debug mode (no WiFi, real hardware)
 
-Para testar todos os estados visuais no hardware sem precisar de WiFi ou agente:
+Test all visual states on real hardware without WiFi or an agent:
 
 ```bash
 cd firmware
-
-# Compilar e gravar modo debug
 pio run -e esp32s3-debug -t upload
 ```
 
-O dispositivo mostra `[DEBUG MODE]` no boot e entra direto na tela de dados com cenários pré-definidos:
+The device shows `[DEBUG MODE]` on boot and opens directly on the data screen with hardcoded scenarios:
 
-- **Tap** → próximo cenário
-- **Long press** → cenário anterior
-- **Auto-avança** a cada 10 segundos
+- **Tap** → next scenario
+- **Long press** → previous scenario
+- **Auto-advances** every 10 seconds
 
-Cenários: `RADIANT → CONTENT → NORMAL → TIRED → EXHAUSTED → OFFLINE → CONFUSED → (repete)`
+Sequence: `RADIANT → CONTENT → NORMAL → TIRED → EXHAUSTED → OFFLINE → CONFUSED → (repeat)`
 
 ---
 
-## Modo Demo (Wokwi + Railway)
+## Demo mode (Wokwi + Railway)
 
-Para simular o firmware sem hardware físico:
+Simulate the firmware without physical hardware.
 
-### 1. Iniciar o mock agent
+### 1. Start the mock agent
 
 ```bash
-# Auto-ciclo (30s por cenário)
+# Auto-cycle (30s per scenario)
 python3 demo/mock_agent.py
 
-# Estado fixo
+# Lock to a specific state
 python3 demo/mock_agent.py --scenario tired
 
-# Intervalo customizado
+# Custom interval
 python3 demo/mock_agent.py --interval 10
 ```
 
-### 2. Controle manual via HTTP
+### 2. Manual control via HTTP
 
 ```bash
-# Forçar um estado
+# Force a state
 curl "http://127.0.0.1:8266/control?scenario=exhausted"
 
-# Listar cenários disponíveis
+# List all scenarios
 curl "http://127.0.0.1:8266/scenarios"
 ```
 
-Cenários disponíveis: `radiant`, `content`, `normal`, `tired`, `exhausted`, `offline`, `error`
+Available scenarios: `radiant`, `content`, `normal`, `tired`, `exhausted`, `offline`, `error`
 
-### 3. Simular no Wokwi (VS Code)
+### 3. Simulate with Wokwi (VS Code)
 
 ```bash
-# Compilar firmware local
 cd firmware && pio run -e esp32s3
 ```
 
-Instale a [extensão Wokwi para VS Code](https://marketplace.visualstudio.com/items?itemName=wokwi.wokwi-vscode) e pressione `F1 → Wokwi: Start Simulator`. O WiFi virtual alcança o `mock_agent.py` no `localhost:8266`.
+Install the [Wokwi VS Code extension](https://marketplace.visualstudio.com/items?itemName=wokwi.wokwi-vscode) and press `F1 → Wokwi: Start Simulator`. The virtual WiFi reaches `mock_agent.py` at `localhost:8266`.
 
-### 4. Simular com mock público (Railway)
+### 4. Simulate with public mock (Railway)
 
-O mock agent está deployado em:
+The mock agent is deployed at:
 ```
 https://claude-tamagotchi-mock-production.up.railway.app
 ```
 
 ```bash
-# Verificar
+# Check it's running
 curl https://claude-tamagotchi-mock-production.up.railway.app/scenarios
 
-# Forçar estado
+# Force a state
 curl "https://claude-tamagotchi-mock-production.up.railway.app/control?scenario=exhausted"
 
-# Compilar firmware apontando para Railway
+# Flash firmware pointing to Railway
 cd firmware && pio run -e esp32s3-demo-web -t upload
 ```
 
 ---
 
-## Histórico de estrelas
+## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=izrafilcst/claude-buddy&type=Date)](https://star-history.com/#izrafilcst/claude-buddy&Date)
 
 ---
 
-## Licença
+## License
 
-MIT — veja [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
 
 ---
 
 <div align="center">
-  <sub>Feito com ☕ e muitas sessões do Claude Code monitoradas pelo próprio Claude Buddy.</sub>
+  <sub>Built with ☕ and many Claude Code sessions monitored by Claude Buddy itself.</sub>
 </div>

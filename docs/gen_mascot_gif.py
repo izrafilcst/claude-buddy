@@ -1,188 +1,245 @@
 #!/usr/bin/env python3
-"""Generate mascot-beach.gif — Claude Buddy orb on a beach, day→night cycle."""
-from PIL import Image, ImageDraw, ImageFilter
+"""Generate mascot-beach.gif — Claw'd on a beach.
+Day (~5s): fishing with animated bobber.
+Night (~15s): sleeping with rising Zzz.
+"""
+from PIL import Image, ImageDraw
 import math, os
 
 W, H = 480, 220
-FRAMES = 48
-DURATION = 80
 
-def lerp(a, b, t):
-    t = max(0.0, min(1.0, t))
-    return a + (b - a) * t
+DAY_FRAMES    = 50
+NIGHT_FRAMES  = 75   # × 200ms = 15s
+DUR_DAY       = 100  # ms
+DUR_NIGHT     = 200  # ms
 
-def lerp_rgb(c1, c2, t):
-    return tuple(int(lerp(c1[i], c2[i], t)) for i in range(3))
+# Palette
+SKY_DAY    = (210, 235, 252)
+SKY_NIGHT  = ( 12,  18,  48)
+OCEAN_DAY  = ( 55, 165, 220)
+OCEAN_NIGHT= (  8,  22,  72)
+SAND_DAY   = (232, 208, 158)
+SAND_NIGHT = (148, 128,  88)
+CLAWD      = (196,  88,  58)   # terracotta — matches reference
+CLAWD_SHAD = (158,  65,  42)
+EYE        = ( 38,  22,  12)
+ROD_C      = ( 90,  58,  28)
+LINE_C     = (190, 190, 190)
+BOBBER_R   = (210,  55,  50)
+BOBBER_W   = (245, 245, 245)
+ZZZ_C      = (200, 215, 255)
 
-SKY_DAY     = (135, 210, 245)
-SKY_GOLDEN  = (255, 175,  90)
-SKY_DUSK    = (120,  60, 110)
-SKY_NIGHT   = ( 12,  18,  48)
-OCEAN_DAY   = ( 55, 160, 220)
-OCEAN_NIGHT = (  8,  25,  75)
-SAND_LIT    = (230, 205, 155)
-SAND_DARK   = (140, 120,  80)
-ORB_CORE    = (193,  95,  60)
-ORB_LIGHT   = (240, 145, 100)
-ORB_GLOW    = (232, 132,  92)
+HORIZON_Y  = int(H * 0.55)
+SAND_Y     = int(H * 0.70)
 
-HORIZON_Y   = int(H * 0.56)
-SAND_Y      = int(H * 0.70)
+# Claw'd geometry
+CX       = 160
+BODY_W   = 56
+BODY_H   = 36
+BODY_BOT = SAND_Y - 14
+BODY_TOP = BODY_BOT - BODY_H
+BODY_L   = CX - BODY_W // 2
+BODY_R   = CX + BODY_W // 2
 
-def sky_color(t):
-    # t: 0=day, 0.4=sunset, 0.55=night, 0.85=pre-dawn, 1=day
-    if t < 0.35:
-        return lerp_rgb(SKY_DAY, SKY_GOLDEN, t / 0.35)
-    elif t < 0.50:
-        return lerp_rgb(SKY_GOLDEN, SKY_DUSK, (t - 0.35) / 0.15)
-    elif t < 0.60:
-        return lerp_rgb(SKY_DUSK, SKY_NIGHT, (t - 0.50) / 0.10)
-    elif t < 0.85:
-        return SKY_NIGHT
-    else:
-        return lerp_rgb(SKY_NIGHT, SKY_DAY, (t - 0.85) / 0.15)
+LEG_W, LEG_H = 10, 16
+LEG_Y0 = BODY_BOT
+LEG_Y1 = LEG_Y0 + LEG_H
+LEG_XS = [BODY_L + 3, BODY_L + 15, BODY_R - 25, BODY_R - 13]
 
-def ocean_color(t):
-    night_t = max(0, min(1, (t - 0.40) / 0.20)) if t < 0.85 else lerp(1, 0, (t - 0.85) / 0.15)
-    return lerp_rgb(OCEAN_DAY, OCEAN_NIGHT, night_t)
+EYE_H2, EYE_W2 = 8, 10
+EYE_Y  = BODY_TOP + 10
+EYE_LX = CX - 16
+EYE_RX = CX + 6
 
-def sand_color(t):
-    night_t = max(0, min(1, (t - 0.45) / 0.15)) if t < 0.85 else lerp(1, 0, (t - 0.85) / 0.15)
-    return lerp_rgb(SAND_LIT, SAND_DARK, night_t)
+ROD_BX = BODY_R - 1
+ROD_BY = BODY_TOP + 10
+ROD_TX = ROD_BX + 90
+ROD_TY = ROD_BY - 60
+
+BOB_X  = ROD_TX + 28
+BOB_Y0 = HORIZON_Y + 10
 
 STARS = [
-    (40, 18), (85, 8), (140, 30), (190, 12), (240, 35),
-    (300, 20), (350, 10), (400, 38), (450, 22), (60, 45),
-    (160, 50), (280, 48), (420, 14), (110, 55), (330, 52),
+    (42,12),(88,7),(148,26),(198,8),(262,32),(322,16),
+    (378,6),(438,28),(58,40),(168,46),(302,43),(418,10),
+    (108,50),(342,48),(462,32),(20,24),(230,18),
 ]
 
-frames = []
-for f in range(FRAMES):
-    t = f / FRAMES
+def lerp_rgb(c1, c2, t):
+    t = max(0.0, min(1.0, t))
+    return tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
 
-    sc = sky_color(t)
-    oc = ocean_color(t)
-    sac = sand_color(t)
-    night_t = max(0, min(1, (t - 0.50) / 0.10)) if t < 0.85 else lerp(1, 0, (t - 0.85) / 0.15)
+def draw_sky_gradient(draw, top_c, hor_c):
+    for y in range(HORIZON_Y):
+        t = y / HORIZON_Y
+        draw.line([(0, y), (W, y)], fill=lerp_rgb(top_c, hor_c, t))
 
-    img = Image.new('RGBA', (W, H), (*sc, 255))
+def draw_ocean(draw, color):
+    draw.rectangle([0, HORIZON_Y, W, SAND_Y], fill=color)
+
+def draw_sand(draw, color):
+    draw.rectangle([0, SAND_Y, W, H], fill=color)
+
+def draw_clawd(draw, closed=False, bob=0):
+    # Body
+    draw.rectangle([BODY_L, BODY_TOP + bob, BODY_R, BODY_BOT + bob], fill=CLAWD)
+    # Bottom shadow strip
+    draw.rectangle([BODY_L, BODY_BOT - 5 + bob, BODY_R, BODY_BOT + bob], fill=CLAWD_SHAD)
+    # Legs
+    for lx in LEG_XS:
+        draw.rectangle([lx, LEG_Y0, lx + LEG_W, LEG_Y1], fill=CLAWD)
+        draw.rectangle([lx, LEG_Y1 - 4, lx + LEG_W, LEG_Y1], fill=CLAWD_SHAD)
+    # Eyes
+    if closed:
+        mid = EYE_Y + EYE_H2 // 2 + bob
+        draw.rectangle([EYE_LX, mid - 1, EYE_LX + EYE_W2, mid + 1], fill=EYE)
+        draw.rectangle([EYE_RX, mid - 1, EYE_RX + EYE_W2, mid + 1], fill=EYE)
+    else:
+        draw.rectangle([EYE_LX, EYE_Y + bob, EYE_LX + EYE_W2, EYE_Y + EYE_H2 + bob], fill=EYE)
+        draw.rectangle([EYE_RX, EYE_Y + bob, EYE_RX + EYE_W2, EYE_Y + EYE_H2 + bob], fill=EYE)
+        # Shine
+        draw.rectangle([EYE_LX+1, EYE_Y+1+bob, EYE_LX+3, EYE_Y+3+bob], fill=(255,255,255))
+        draw.rectangle([EYE_RX+1, EYE_Y+1+bob, EYE_RX+3, EYE_Y+3+bob], fill=(255,255,255))
+
+def draw_rod(draw, bobber_off=0):
+    draw.line([(ROD_BX, ROD_BY), (ROD_TX, ROD_TY)], fill=ROD_C, width=3)
+    by = BOB_Y0 + bobber_off
+    draw.line([(ROD_TX, ROD_TY), (BOB_X, by)], fill=LINE_C, width=1)
+    draw.ellipse([BOB_X-5, by-5, BOB_X+5, by+5], fill=BOBBER_R)
+    draw.ellipse([BOB_X-5, by-5, BOB_X+5, by],   fill=BOBBER_W)
+
+def draw_pixel_z(draw, x, y, sz, alpha):
+    """Pixel-art Z: top bar, diagonal, bottom bar."""
+    c = (*ZZZ_C, alpha)
+    t = max(1, sz // 5)
+    draw.rectangle([x, y,           x + sz, y + t],          fill=c)  # top
+    draw.rectangle([x, y + sz - t,  x + sz, y + sz],          fill=c)  # bottom
+    steps = sz
+    for s in range(steps + 1):
+        px = x + sz - int(s * sz / steps)
+        py = y + int(s * sz / steps)
+        draw.rectangle([px, py, min(px+t, x+sz), min(py+t, y+sz)], fill=c)
+
+def draw_zzz(img, f, total):
+    overlay = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(overlay)
+    # 3 Z's staggered in time
+    sizes = [8, 12, 17]
+    for z_idx, sz in enumerate(sizes):
+        phase = (f + z_idx * (total // 3)) % total
+        progress = phase / total              # 0 → 1
+        if progress > 0.75:
+            continue
+        alpha = int(255 * (1 - progress / 0.75))
+        zx = BODY_R + 6 + z_idx * 14
+        zy = BODY_TOP - 8 - int(progress * 50)
+        draw_pixel_z(d, zx, zy, sz, alpha)
+    return Image.alpha_composite(img, overlay)
+
+
+frames   = []
+durations = []
+
+# ─── DAY: Claw'd fishing ───────────────────────────────────────────────────
+for f in range(DAY_FRAMES):
+    t = f / DAY_FRAMES
+
+    img  = Image.new('RGBA', (W, H))
     draw = ImageDraw.Draw(img)
 
-    # Sky gradient (lighter at horizon)
-    horizon_c = lerp_rgb(sc, (255, 255, 255), 0.15)
-    for y in range(HORIZON_Y):
-        blend = y / HORIZON_Y
-        row_c = lerp_rgb(sc, horizon_c, blend * 0.4)
-        draw.line([(0, y), (W, y)], fill=(*row_c, 255))
+    draw_sky_gradient(draw, SKY_DAY, lerp_rgb(SKY_DAY, (255, 220, 150), 0.25))
 
-    # Stars
-    for sx, sy in STARS:
-        alpha = int(255 * night_t * (0.6 + 0.4 * math.sin(f * 0.3 + sx)))
-        r = 1 if sx % 3 != 0 else 2
-        draw.ellipse([sx - r, sy - r, sx + r, sy + r], fill=(255, 255, 220, alpha))
-
-    # Moon
-    if night_t > 0.05:
-        ma = int(255 * night_t)
-        mx, my = 390, 38
-        draw.ellipse([mx - 18, my - 18, mx + 18, my + 18], fill=(245, 245, 210, ma))
-        draw.ellipse([mx - 8, my - 22, mx + 14, my + 14], fill=(*sky_color(0.65), ma))
+    # Clouds
+    for cx2, cy2 in [(70, 28), (230, 18), (370, 35)]:
+        for dx in [-15, 0, 15]:
+            draw.ellipse([cx2+dx-22, cy2-10, cx2+dx+22, cy2+12], fill=(255,255,255,210))
 
     # Sun
-    sun_alpha_t = (1 - max(0, min(1, (t - 0.30) / 0.20))) if t < 0.5 else max(0, min(1, (t - 0.85) / 0.15))
-    if sun_alpha_t > 0.05:
-        angle = t * 2 * math.pi
-        sun_x = int(W * 0.5 + W * 0.3 * math.cos(angle + math.pi))
-        sun_y = int(HORIZON_Y * 0.5 - HORIZON_Y * 0.3 * math.sin(angle))
-        sun_y = max(15, min(HORIZON_Y - 10, sun_y))
-        sa = int(255 * sun_alpha_t)
-        # glow
-        for gr in [28, 22, 18]:
-            ga = int(sa * 0.25)
-            draw.ellipse([sun_x - gr, sun_y - gr, sun_x + gr, sun_y + gr],
-                         fill=(255, 220, 80, ga))
-        draw.ellipse([sun_x - 14, sun_y - 14, sun_x + 14, sun_y + 14],
-                     fill=(255, 230, 60, sa))
+    sx, sy = W - 75, 42
+    for gr, ga in [(32,30),(24,55),(15,255)]:
+        draw.ellipse([sx-gr, sy-gr, sx+gr, sy+gr], fill=(255,230,55,ga))
 
-    # Ocean
-    draw.rectangle([0, HORIZON_Y, W, SAND_Y], fill=(*oc, 255))
+    draw_ocean(draw, OCEAN_DAY)
 
-    # Ocean shimmer
-    shimmer_t = max(0, 1 - night_t * 0.7)
-    for wx in range(0, W, 22):
-        wave_x = (wx + f * 4) % W
-        wy = HORIZON_Y + 8 + int(4 * math.sin(wave_x * 0.05 + f * 0.3))
-        sc2 = lerp_rgb(oc, (255, 255, 255), 0.25 * shimmer_t)
-        draw.ellipse([wave_x, wy, wave_x + 18, wy + 4], outline=(*sc2, 180), width=1)
+    # Waves
+    for wx in range(-20, W + 20, 22):
+        wy = HORIZON_Y + 5 + int(3 * math.sin((wx + f*3) * 0.09))
+        draw.arc([wx-10, wy-3, wx+10, wy+4], 0, 180, fill=(255,255,255,150), width=2)
 
-    # Sand
-    draw.rectangle([0, SAND_Y, W, H], fill=(*sac, 255))
+    draw_sand(draw, SAND_DAY)
 
-    # Sand texture lines
-    for sy_off in range(0, H - SAND_Y, 12):
-        y2 = SAND_Y + sy_off
-        sc3 = lerp_rgb(sac, (0, 0, 0), 0.05)
-        draw.line([(0, y2), (W, y2)], fill=(*sc3, 60), width=1)
+    # Claw'd shadow
+    draw.ellipse([BODY_L+6, SAND_Y+1, BODY_R-6, SAND_Y+7], fill=(170,140,90,70))
 
-    # Orb mascot — sitting on sand
-    pulse = 0.90 + 0.10 * math.sin(f * 0.45)
-    orb_r = int(32 * pulse)
-    orb_x = W // 2
-    orb_y = SAND_Y - orb_r + 6
+    # Bobber bob + fish splash
+    bob_off = int(4 * math.sin(t * 2 * math.pi * 4))
+    draw_rod(draw, bob_off)
 
-    # Glow (multi-layer)
-    glow_img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
-    gd = ImageDraw.Draw(glow_img)
-    for layer, (gr, ga_base) in enumerate([(orb_r + 28, 18), (orb_r + 18, 35), (orb_r + 10, 55)]):
-        ga = int(ga_base * (0.5 + 0.5 * night_t + 0.3))
-        gd.ellipse([orb_x - gr, orb_y - gr, orb_x + gr, orb_y + gr],
-                   fill=(*ORB_GLOW, ga))
-    img = Image.alpha_composite(img, glow_img)
-    draw = ImageDraw.Draw(img)
+    if 0.38 < t < 0.44:   # fish splash moment
+        bx, by = BOB_X, BOB_Y0 + bob_off
+        for r2 in [10, 7, 4]:
+            draw.arc([bx-r2, by-r2//2, bx+r2, by+r2//2], 0, 180,
+                     fill=(255,255,255,100), width=1)
 
-    # Core
-    draw.ellipse([orb_x - orb_r, orb_y - orb_r, orb_x + orb_r, orb_y + orb_r],
-                 fill=(*ORB_CORE, 255))
-
-    # Radial gradient (lighter center-top)
-    for gr in range(orb_r, 0, -4):
-        ratio = 1 - gr / orb_r
-        rc = lerp_rgb(ORB_CORE, ORB_LIGHT, ratio * 0.6)
-        draw.ellipse([orb_x - gr, orb_y - orb_r + 4, orb_x + gr, orb_y - orb_r + 4 + gr * 2],
-                     fill=(*rc, 80))
-
-    # Specular highlight
-    hl_r = orb_r // 3
-    draw.ellipse([orb_x - hl_r * 2, orb_y - orb_r + 4,
-                  orb_x - hl_r // 2, orb_y - orb_r + 4 + hl_r],
-                 fill=(255, 215, 185, 160))
-
-    # Eyes (blinking on frame 0 and 24)
-    blink = f in (0, 1, 24, 25)
-    eye_y = orb_y - 4
-    if blink:
-        draw.line([(orb_x - 9, eye_y), (orb_x - 3, eye_y)], fill=(40, 15, 8), width=2)
-        draw.line([(orb_x + 3, eye_y), (orb_x + 9, eye_y)], fill=(40, 15, 8), width=2)
-    else:
-        draw.ellipse([orb_x - 9, eye_y - 3, orb_x - 3, eye_y + 3], fill=(40, 15, 8))
-        draw.ellipse([orb_x + 3, eye_y - 3, orb_x + 9, eye_y + 3], fill=(40, 15, 8))
-        draw.ellipse([orb_x - 7, eye_y - 2, orb_x - 6, eye_y - 1], fill=(255, 255, 255))
-        draw.ellipse([orb_x + 5, eye_y - 2, orb_x + 6, eye_y - 1], fill=(255, 255, 255))
-
-    # Shadow on sand
-    shad_alpha = int(50 + 30 * night_t)
-    draw.ellipse([orb_x - orb_r + 6, SAND_Y + 2, orb_x + orb_r - 6, SAND_Y + 10],
-                 fill=(80, 60, 30, shad_alpha))
+    draw_clawd(draw, closed=False, bob=0)
 
     frames.append(img.convert('RGB'))
+    durations.append(DUR_DAY)
 
-out = os.path.join(os.path.dirname(__file__), 'mascot-beach.gif')
+# ─── NIGHT: Claw'd sleeping ────────────────────────────────────────────────
+for f in range(NIGHT_FRAMES):
+    t = f / NIGHT_FRAMES
+
+    img  = Image.new('RGBA', (W, H))
+    draw = ImageDraw.Draw(img)
+
+    draw_sky_gradient(draw, SKY_NIGHT, lerp_rgb(SKY_NIGHT, (30, 45, 100), 0.5))
+
+    # Stars
+    for sx2, sy2 in STARS:
+        twinkle = 0.65 + 0.35 * math.sin(f * 0.12 + sx2 * 0.25)
+        r2 = 1 if sx2 % 3 != 0 else 2
+        draw.ellipse([sx2-r2, sy2-r2, sx2+r2, sy2+r2], fill=(255,255,215,int(220*twinkle)))
+
+    # Crescent moon
+    mx2, my2 = W - 72, 38
+    draw.ellipse([mx2-22, my2-22, mx2+22, my2+22], fill=(245,245,200))
+    draw.ellipse([mx2- 9, my2-26, mx2+18, my2+14], fill=SKY_NIGHT)
+
+    draw_ocean(draw, OCEAN_NIGHT)
+
+    # Moon reflection
+    for ry in range(HORIZON_Y + 3, SAND_Y, 3):
+        a3 = int(55 * (1 - (ry - HORIZON_Y) / (SAND_Y - HORIZON_Y)))
+        draw.line([(mx2-7, ry), (mx2+7, ry)], fill=(245,245,200,a3))
+
+    draw_sand(draw, SAND_NIGHT)
+
+    # Claw'd shadow
+    draw.ellipse([BODY_L+6, SAND_Y+1, BODY_R-6, SAND_Y+7], fill=(100,82,58,55))
+
+    # Breathing bob
+    bob = int(1.5 * math.sin(t * 2 * math.pi * 1.5))
+    draw_clawd(draw, closed=True, bob=bob)
+
+    # Zzz overlay
+    img = draw_zzz(img, f, NIGHT_FRAMES)
+
+    frames.append(img.convert('RGB'))
+    durations.append(DUR_NIGHT)
+
+# ─── Save ──────────────────────────────────────────────────────────────────
+out = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mascot-beach.gif')
 frames[0].save(
     out,
     save_all=True,
     append_images=frames[1:],
     loop=0,
-    duration=DURATION,
+    duration=durations,
     optimize=True,
 )
-print(f"✓ {FRAMES} frames → {out}")
+total_s = (DAY_FRAMES * DUR_DAY + NIGHT_FRAMES * DUR_NIGHT) / 1000
+print(f"✓ {DAY_FRAMES} day frames ({DAY_FRAMES*DUR_DAY/1000:.1f}s) + "
+      f"{NIGHT_FRAMES} night frames ({NIGHT_FRAMES*DUR_NIGHT/1000:.1f}s) "
+      f"= {total_s:.1f}s cycle")
+print(f"  → {out}")
