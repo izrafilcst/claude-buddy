@@ -30,7 +30,7 @@ static unsigned long last_poll = 0;
 static unsigned long last_touch_time = 0;
 static unsigned long last_bat_read = 0;
 
-static char agent_host[40] = AGENT_HOST;
+static char agent_host[64] = AGENT_HOST;
 static uint16_t agent_port = AGENT_PORT;
 static int alert_threshold = ALERT_THRESHOLD_DEFAULT;
 
