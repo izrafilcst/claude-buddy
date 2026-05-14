@@ -55,6 +55,11 @@ def make_handler(state):
         def log_message(self, fmt, *args):
             pass  # suppress default per-request log
 
+        def do_OPTIONS(self):
+            self.send_response(204)
+            self._cors()
+            self.end_headers()
+
         def do_GET(self):
             parsed = urlparse(self.path)
             params = parse_qs(parsed.query)
@@ -63,46 +68,40 @@ def make_handler(state):
                 scenario = state.get()
                 if scenario == "error":
                     self.send_response(500)
+                    self._cors()
                     self.end_headers()
                     return
-                payload = json.dumps(state.scenarios[scenario]).encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(payload)))
-                self.end_headers()
-                self.wfile.write(payload)
+                self._reply(200, json.dumps(state.scenarios[scenario]).encode())
 
             elif parsed.path == "/control":
                 name = params.get("scenario", [None])[0]
                 valid = list(state.scenarios.keys()) + ["error"]
                 if name not in valid:
-                    body = json.dumps({"ok": False, "error": f"unknown scenario '{name}'"}).encode()
-                    self.send_response(400)
-                    self.send_header("Content-Type", "application/json")
-                    self.send_header("Content-Length", str(len(body)))
-                    self.end_headers()
-                    self.wfile.write(body)
+                    self._reply(400, json.dumps({"ok": False, "error": f"unknown scenario '{name}'"}).encode())
                     return
                 state.set(name)
-                body = json.dumps({"ok": True, "scenario": name}).encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                self._reply(200, json.dumps({"ok": True, "scenario": name}).encode())
 
             elif parsed.path == "/scenarios":
                 names = list(state.scenarios.keys()) + ["error"]
-                body = json.dumps({"scenarios": names}).encode()
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                self._reply(200, json.dumps({"scenarios": names}).encode())
 
             else:
                 self.send_response(404)
                 self.end_headers()
+
+        def _cors(self):
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+
+        def _reply(self, code, body: bytes):
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self._cors()
+            self.end_headers()
+            self.wfile.write(body)
 
     return Handler
 
