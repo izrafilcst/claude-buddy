@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -112,6 +113,10 @@ def main():
                         help="seconds per scenario in auto-cycle (default: 30)")
     parser.add_argument("--scenario", default=None,
                         help="lock to a specific scenario, disables auto-cycle")
+    parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"),
+                        help="bind host (default: 127.0.0.1, use 0.0.0.0 for cloud)")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", PORT)),
+                        help="bind port (default: 8266, Railway sets PORT env var)")
     args = parser.parse_args()
 
     scenarios = load_scenarios()
@@ -130,10 +135,10 @@ def main():
     else:
         print(f"[mock] fixed scenario='{initial}'")
 
-    print(f"[mock] listening on http://127.0.0.1:{PORT}")
-    print(f"[mock] control: curl 'http://127.0.0.1:{PORT}/control?scenario=tired'")
+    print(f"[mock] listening on http://{args.host}:{args.port}")
+    print(f"[mock] control: curl 'http://{args.host}:{args.port}/control?scenario=tired'")
 
-    server = HTTPServer(("127.0.0.1", PORT), make_handler(state))
+    server = HTTPServer((args.host, args.port), make_handler(state))
     try:
         server.serve_forever()
     except KeyboardInterrupt:
