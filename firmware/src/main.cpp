@@ -10,6 +10,9 @@
 #include "tamagotchi.h"
 #include "alert.h"
 #include "battery.h"
+#ifdef DEBUG_MODE
+#include "debug_scenarios.h"
+#endif
 
 enum class Mode : uint8_t { IDLE, DATA, SETTINGS };
 
@@ -33,6 +36,31 @@ static unsigned long last_bat_read = 0;
 static char agent_host[64] = AGENT_HOST;
 static uint16_t agent_port = AGENT_PORT;
 static int alert_threshold = ALERT_THRESHOLD_DEFAULT;
+
+#ifdef DEBUG_MODE
+static int debug_idx = 0;
+static unsigned long debug_last_advance = 0;
+
+static void debugLoad(int idx) {
+    debug_idx = ((idx % DEBUG_SCENARIO_COUNT) + DEBUG_SCENARIO_COUNT) % DEBUG_SCENARIO_COUNT;
+    status = debugBuildStatus(debug_idx);
+    status.fetch_time = millis();
+    data_dirty = true;
+    debug_last_advance = millis();
+    Serial.printf("[DEBUG] %d/%d %s\n", debug_idx + 1, DEBUG_SCENARIO_COUNT, DEBUG_DATA[debug_idx].label);
+}
+
+static void debugLabel() {
+    char buf[28];
+    snprintf(buf, sizeof(buf), "[DBG] %s  %d/%d",
+             DEBUG_DATA[debug_idx].label, debug_idx + 1, DEBUG_SCENARIO_COUNT);
+    TFT_eSPI* tft = display.tft();
+    tft->setTextDatum(MC_DATUM);
+    tft->fillRect(0, 0, SCREEN_W, 14, Colors::DARK_BG);
+    tft->setTextColor(Colors::CRAIL_LIGHT, Colors::DARK_BG);
+    tft->drawString(buf, SCREEN_W / 2, 7, 1);
+}
+#endif
 
 static void loadSettings() {
     prefs.begin("claude", true);
@@ -127,33 +155,68 @@ void setup() {
     display.begin();
     touch.begin(display.tft());
 
+#ifdef DEBUG_MODE
+    Serial.println("[DEBUG] mode — WiFi disabled");
+    display.tft()->setTextDatum(MC_DATUM);
+    display.tft()->setTextColor(Colors::CRAIL_LIGHT, Colors::PAMPAS);
+    display.tft()->drawString("[DEBUG MODE]", SCREEN_W / 2, SCREEN_H / 2, 2);
+    delay(800);
+    wifi_ok = false;
+#else
     loadSettings();
-
     display.tft()->setTextColor(Colors::CLOUDY, Colors::PAMPAS);
     display.tft()->setTextDatum(MC_DATUM);
     display.tft()->drawString("Connecting...", SCREEN_W / 2, SCREEN_H / 2, 2);
-
     WiFiManager wm;
     wm.setConfigPortalTimeout(180);
     wm.autoConnect("ClaudeTamagotchi");
     wifi_ok = (WiFi.status() == WL_CONNECTED);
-
     api.begin(agent_host, agent_port);
+#endif
+
     mascot.begin(display.tft());
     alert.begin(PIN_PIEZO);
     alert.setThreshold(alert_threshold);
     battery.begin(PIN_BAT_ADC);
     battery_pct = battery.percent();
 
+#ifdef DEBUG_MODE
+    debugLoad(0);
+    switchMode(Mode::DATA);
+#else
     poll();
     switchMode(Mode::IDLE);
+#endif
 }
 
 void loop() {
     unsigned long now = millis();
-
     TouchEvent ev = touch.update();
 
+#ifdef DEBUG_MODE
+    if (ev == TouchEvent::TAP) {
+        debugLoad(debug_idx + 1);
+        switchMode(Mode::DATA);
+    } else if (ev == TouchEvent::LONG_PRESS) {
+        debugLoad(debug_idx - 1);
+        switchMode(Mode::DATA);
+    }
+    if (now - debug_last_advance >= DEBUG_INTERVAL_MS) {
+        debugLoad(debug_idx + 1);
+        switchMode(Mode::DATA);
+    }
+    if (now - last_bat_read >= BATTERY_READ_MS) {
+        battery_pct = battery.percent();
+        last_bat_read = now;
+    }
+    alert.check(status.quota_percent);
+    if (data_dirty) {
+        display.drawDataScreen(status, battery_pct, false);
+        debugLabel();
+        data_dirty = false;
+    }
+    display.animateHeaderDots();
+#else
     switch (mode) {
     case Mode::IDLE:
         if (ev == TouchEvent::TAP) {
@@ -188,27 +251,22 @@ void loop() {
         }
         break;
     }
-
     if (now - last_poll >= POLL_INTERVAL_MS) {
         poll();
         last_poll = now;
     }
-
     if (now - last_bat_read >= BATTERY_READ_MS) {
         battery_pct = battery.percent();
         last_bat_read = now;
     }
-
     if (mode == Mode::DATA && now - last_touch_time >= DATA_TIMEOUT_MS) {
         switchMode(Mode::IDLE);
     }
-
     alert.check(status.quota_percent);
     if (alert.justTriggered() && mode == Mode::IDLE) {
         last_touch_time = now;
         switchMode(Mode::DATA);
     }
-
     switch (mode) {
     case Mode::IDLE:
         mascot.setState(status.quota_percent, status.valid, wifi_ok);
@@ -229,6 +287,7 @@ void loop() {
     case Mode::SETTINGS:
         break;
     }
+#endif
 
     delay(ANIM_FRAME_MS);
 }
