@@ -9,3 +9,6 @@ __pycache__/
 # Editor
 .vscode/
 *.swp
+
+# Superpowers brainstorm sessions
+.superpowers/
